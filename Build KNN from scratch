@@ -1,0 +1,185 @@
+##导入数据集和标签集
+import numpy as np
+import operator
+#import operator
+Train_label = np.loadtxt('MNIST-Train-Labels-cropped.txt')
+Train_set = np.loadtxt('MNIST-Train-cropped.txt')
+Test_set = np.loadtxt('MNIST-Test-cropped.txt')
+test_set = Test_set.reshape((2000,784))
+test_label = np.loadtxt('MNIST-Test-Labels-cropped.txt')
+
+Train_set = Train_set.reshape((10000,784))
+#print(Train_set.shape)
+
+
+##将train切割为80％train_set和20％val_set
+from sklearn.model_selection import train_test_split
+#Train_set 需要分割的数据集；
+#train_set 分割后的train数据集； train_label 分割后的train标签
+#Train_label 需要分割的标签；
+#val_set 分割后的val数据集；val_label 分割后的val标签
+#random_state 设置随机种子，保证每次运行生成相同的随机数
+#val_size 将数据分割成验证集的比例
+train_set, val_set, train_label, val_label = train_test_split(Train_set, Train_label, test_size = 0.2, random_state = 42)
+
+
+#print(train_set.shape)
+
+##选出train_set里的特定数据
+train_position1 = np.where((train_label == 0) | (train_label == 1))
+train_label1 = train_label[np.where((train_label == 0) | (train_label == 1))]
+#print(train_position1)
+#print(train_label1)
+for x in train_position1:
+    #print(x)
+    extract_train = train_set[[x], :]
+    train_set1 = np.concatenate((extract_train),axis=0)
+#print(train_set1)
+
+
+##选出val_set里面的特定数据
+val_position1 = np.where((val_label == 5) | (val_label == 6))
+val_label1 = val_label[np.where((val_label == 5) | (val_label == 6))]
+#print(val_position1)
+#print(val_label1)
+val_label1 = val_label1.tolist() #############
+for x in val_position1:
+    #print(x)
+    extract_val = val_set[[x], :]
+    val_set1 = np.concatenate((extract_val),axis=0)
+#print(val_set1)
+
+
+##选出test_set里面的特定数据
+test_position1 = np.where((test_label == 5) | (test_label == 6))
+test_label1 = test_label[np.where((test_label == 5) | (test_label == 6))]
+#print(test_position1)
+#print(test_label1)
+test_label1 = test_label1.tolist()
+for x in test_position1:
+    #print(x)
+    extract_test = test_set[[x], :]
+    test_set1 = np.concatenate((extract_test),axis=0)
+#print(test_set1)
+
+#--------
+val_set1_list = val_set1.tolist() #将val_set1转为矩阵List
+test_set1_list = test_set1.tolist() #将test_set1转为矩阵list
+
+##把val_set和test_set的数据转为一个矩阵list：
+
+##define KNN
+def KNNClassify(train_matrix, val_matrix, labels, k):
+    
+    ##获取样本数据数量
+    train_size = train_matrix.shape[0]
+    val_matrix_list = val_matrix.tolist()
+    
+    guess_label = []
+    for i in range(len(val_matrix_list)):
+        val_vector = val_matrix_list[i]   
+        #矩阵运算，计算测试数据与每个样本数据对应数据项的差值
+        diffMat = np.tile(val_vector, (train_size,1)) - train_matrix
+    
+        #上一步结果的平方和
+        sqdiffMat = diffMat**2
+        sqdistances = sqdiffMat.sum(axis=1)
+        
+        #取平方根，得到欧氏距离
+        distances = sqdistances**0.5
+
+        #按照距离从小到大排序，把排序前list的下标作为新List的值组成一个列表
+        sorted_distances_index = distances.argsort()
+        ####sorted_distances_index = tuple(sorted_distances_index)
+        
+        #空字典，存储类和类的个数
+        num_count={}
+        
+        #依此取出最近的样本数据
+        for i in range(k):
+            
+            # 记录该样本数据对应的真实数字（使得最终选不选该数字依赖于其出现的频率）
+            one_possible_number = labels[sorted_distances_index[i]]
+            ####one_possible_number = tuple(one_possible_number)
+      
+            num_count[one_possible_number] = num_count.get(one_possible_number, 0) + 1
+     
+        # sorted函数在不改变原序列条件下对类别出现的频次进行排序，从高到低，itermgetter返回一个用于提取数值的函数
+        sorted_num_count = sorted(num_count.items(), key=operator.itemgetter(1), reverse=True)
+        
+        ####return(sorted_num_count[0][0])
+
+        #将出现频次最高的数字添入列表
+        guess_label.append(sorted_num_count[0][0])
+        
+    return(guess_label)# 返回出现频次最高的数字
+
+
+guess_label1 = KNNClassify(train_set1,val_set1, train_label1, 5) 
+## 定义测试算法
+def run():
+ 
+    # 初始化错误率
+    errorcount = 0.0
+ 
+    # 循环测试每个测试数据文件
+    for i in range(len(val_set1_list)): #########
+        real = val_label1[i] #############
+        
+        #print(guess_label1)
+        guess = guess_label1[i]
+
+        # 判断KN-N算法结果是否准确
+        if guess != real:
+            errorcount += 1
+ 
+    #print error
+    #print("\nthe total number of errors is: %d" % errorcount)
+    #print("\nthe total error rate is: %f" % (errorcount / len(val_set1)))
+    error = errorcount / len(val_set1)
+    return(error)
+
+
+#对val_set分类得到guess_label:
+val_error_list = []
+for i in range(17):
+    K = 2*i+1
+    guess_label1 = KNNClassify(train_set1,val_set1, train_label1, K) ##########
+
+    val_error = run()
+    val_error_list.append(val_error)
+    
+print(val_error_list)
+
+
+# 执行算法测试
+#run()
+
+'''
+##查看不同K值的错误率
+from sklearn import neighbors
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+import matplotlib.pyplot as plt
+import pandas as pd
+
+#存储不同K值的val_set的RMSE值
+rmse_val = []
+rmse_test = []
+for k in range(17):
+    K = 2*k + 1
+    model = neighbors.KNeighborsRegressor(n_neighbors=K)
+    model.fit(train_set1, train_label1)#训练模型
+    val = model.predict(val_set1)#对val集测试
+    test = model.predict(test_set1)#对test集测试
+    val_error = sqrt(mean_squared_error(val_label1, val))#计算val_set的RMSE值
+    test_error = sqrt(mean_squared_error(test_label1,test))
+    rmse_val.append(val_error)#存储RMSE值
+    rmse_test.append(test_error)
+    #print('RMSE value for k =',K,'is',error)
+    
+curve1 = pd.DataFrame(rmse_val) #elbow curve
+curve1.plot()
+curve2 = pd.DataFrame(rmse_test)
+curve2.plot()
+'''
